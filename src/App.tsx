@@ -164,7 +164,7 @@ function CalPopover({task,pos,onClose,onUpdate,onDelete,onToggle,allCats}: {task
         <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:C.t3,padding:0}}><X size={14}/></button>
       </div>
       <div style={{display:'flex',gap:3,marginBottom:8}}>
-        {['high','medium','low'].map(p=><button key={p} onClick={()=>setData({...data,priority:p})} style={{flex:1,padding:'4px',borderRadius:5,border:'2px solid '+(data.priority===p?C[p as keyof typeof C]:C.b+'44'),background:data.priority===p?C[p as keyof typeof C]+'22':'transparent',color:data.priority===p?C[p as keyof typeof C]:C.t3,cursor:'pointer',fontSize:10,fontWeight:600}}>{PL[p]}</button>)}
+        {['high','medium','low'].map(p=><button key={p} onClick={()=>setData({...data,priority:p})} style={{flex:1,padding:'4px',borderRadius:5,border:'2px solid '+(data.priority===p?(C[p as keyof typeof C] as string):C.b+'44'),background:data.priority===p?(C[p as keyof typeof C] as string)+'22':'transparent',color:data.priority===p?(C[p as keyof typeof C] as string):C.t3,cursor:'pointer',fontSize:10,fontWeight:600}}>{PL[p]}</button>)}
       </div>
       <div style={{display:'flex',gap:3,marginBottom:8}}>
         {Object.entries(CAL_TYPES).map(([k,v])=>{const I=v.icon;return <button key={k} onClick={()=>{const u: Partial<Task>={calendarType:k};if(k==='allday')u.estimatedHours=8;if(k==='reminder'||k==='todo')u.estimatedHours=0;setData({...data,...u});}} style={{flex:1,padding:'4px 2px',borderRadius:5,border:'2px solid '+(data.calendarType===k?C.gcal:C.b+'44'),background:data.calendarType===k?C.gcal+'22':'transparent',color:data.calendarType===k?C.gcal:C.t3,cursor:'pointer',fontSize:9,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',gap:2}}><I size={9}/>{v.label}</button>;})}
@@ -329,7 +329,7 @@ function MetaEditor({data,onChange,onConfirm,onCancel,existingCats}: {data:Task,
         <div>
           <label style={{fontSize:11,color:C.t3,fontWeight:600,display:'block',marginBottom:4}}>Priorität</label>
           <div style={{display:'flex',gap:4}}>
-            {['high','medium','low'].map(p=><button key={p} onClick={()=>onChange({...data,priority:p})} style={{flex:1,padding:'6px 2px',borderRadius:6,border:'2px solid '+(data.priority===p?C[p as keyof typeof C]:C.b+'44'),background:data.priority===p?C[p as keyof typeof C]+'22':'transparent',color:data.priority===p?C[p as keyof typeof C]:C.t3,cursor:'pointer',fontSize:11,fontWeight:600}}>{PL[p]}</button>)}
+            {['high','medium','low'].map(p=><button key={p} onClick={()=>onChange({...data,priority:p})} style={{flex:1,padding:'6px 2px',borderRadius:6,border:'2px solid '+(data.priority===p?(C[p as keyof typeof C] as string):C.b+'44'),background:data.priority===p?(C[p as keyof typeof C] as string)+'22':'transparent',color:data.priority===p?(C[p as keyof typeof C] as string):C.t3,cursor:'pointer',fontSize:11,fontWeight:600}}>{PL[p]}</button>)}
           </div>
         </div>
         <div>
@@ -373,7 +373,7 @@ function TaskCard({task,onToggle,onDelete,onEdit,onCalendar,allCats}: {task:Task
         <span style={{color:task.completed?C.t3:C.t,textDecoration:task.completed?'line-through':'none',fontSize:13,fontWeight:500}}>{task.title}</span>
         <div style={{display:'flex',gap:4,marginTop:5,flexWrap:'wrap',alignItems:'center'}}>
           <span style={{fontSize:10,padding:'1px 7px',borderRadius:99,background:cc+'20',color:cc,fontWeight:600}}>{task.category}</span>
-          <span style={{fontSize:10,padding:'1px 7px',borderRadius:99,background:C[task.priority as keyof typeof C]+'20',color:C[task.priority as keyof typeof C],fontWeight:600}}>{PL[task.priority]}</span>
+          <span style={{fontSize:10,padding:'1px 7px',borderRadius:99,background:(C[task.priority as keyof typeof C] as string)+'20',color:(C[task.priority as keyof typeof C] as string),fontWeight:600}}>{PL[task.priority]}</span>
           <span style={{fontSize:10,padding:'1px 7px',borderRadius:99,background:C.gcal+'15',color:C.gcal,display:'flex',alignItems:'center',gap:3}}><CTIcon size={9}/>{CT.label}</span>
           {showTime&&task.estimatedHours>0&&<span style={{fontSize:10,padding:'1px 7px',borderRadius:99,background:C.s2,color:C.t2,display:'flex',alignItems:'center',gap:3}}><Timer size={9}/>{fmtH(task.estimatedHours)}</span>}
           {task.deadline&&<span style={{fontSize:10,padding:'1px 7px',borderRadius:99,background:C.s2,color:C.t2,display:'flex',alignItems:'center',gap:3}}><Calendar size={9}/>{new Date(task.deadline).toLocaleDateString('de-DE')}</span>}
@@ -409,7 +409,7 @@ export default function SmartTodoInbox(){
   const [showSettings,setShowSettings]=useState(false);
   const [calendarName,setCalendarName]=useState('');
   const [apiKey,setApiKey]=useState('');
-  const recRef=useRef<SpeechRecognition|null>(null);
+  const recRef=useRef<any>(null);
 
   // Load from localStorage
   useEffect(()=>{
@@ -470,7 +470,7 @@ export default function SmartTodoInbox(){
     }catch(e){setAiSuggestion({loading:false,text:'Fehlgeschlagen.'});}
   }
 
-  function toggleVoice(){if(listening){if(recRef.current)recRef.current.stop();setListening(false);return;}if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){notify('Nicht unterstützt');return;}const SR=(window as Window & {SpeechRecognition?:typeof SpeechRecognition,webkitSpeechRecognition?:typeof SpeechRecognition}).SpeechRecognition||(window as Window & {webkitSpeechRecognition?:typeof SpeechRecognition}).webkitSpeechRecognition;if(!SR)return;const rec=new SR();rec.lang='de-DE';rec.continuous=false;rec.interimResults=true;rec.onresult=(e)=>{setInput(Array.from(e.results).map(r=>r[0].transcript).join(''));};rec.onend=()=>setListening(false);rec.onerror=()=>{setListening(false);notify('Sprachfehler');};recRef.current=rec;rec.start();setListening(true);}
+  function toggleVoice(){if(listening){if(recRef.current)recRef.current.stop();setListening(false);return;}if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){notify('Nicht unterstützt');return;}const SR=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;if(!SR)return;const rec=new SR();rec.lang='de-DE';rec.continuous=false;rec.interimResults=true;rec.onresult=(e: any)=>{setInput(Array.from(e.results).map((r: any)=>r[0].transcript).join(''));};rec.onend=()=>setListening(false);rec.onerror=()=>{setListening(false);notify('Sprachfehler');};recRef.current=rec;rec.start();setListening(true);}
   function submit(){if(!input.trim()||processing)return;processAI(input.trim());setInput('');}
 
   function slackMsg(){const open=tasks.filter(t=>!t.completed);const g=_.groupBy(open,'priority');let m='📋 *Tasks* ('+new Date().toLocaleDateString('de-DE')+')\n\n';(['high','medium','low'] as const).forEach(p=>{if(g[p]&&g[p].length){m+=(p==='high'?'🔴':p==='medium'?'🟡':'🟢')+' *'+PL[p]+'*\n';g[p].forEach(t=>{m+='• '+t.title+(t.estimatedHours?' ('+fmtH(t.estimatedHours)+')':'')+'\n';});m+='\n';}});return m;}
