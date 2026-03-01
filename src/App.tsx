@@ -7,7 +7,7 @@ import _ from "lodash";
 //   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('DEIN_PASSWORT'));
 //   console.log([...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''));
 // Then replace the string below with the new hash.
-const PASS_HASH = "ee87360de3f2e93c0e1f0c11c01cb24d02f03f1c5a29b6e74ef37e4a5e4e8db2";
+const PASS_HASH = "ef4a24c7c6e8966c5c4c00cb9c1bde31e0fc18751d9a23e31d0bf6985c696b20";
 const SESSION_KEY = "mmm-auth";
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
 
