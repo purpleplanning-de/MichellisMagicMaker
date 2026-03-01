@@ -1,6 +1,73 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Mic, MicOff, Check, Trash2, Send, Inbox, AlertTriangle, Layers, Sparkles, ChevronDown, ChevronRight, ChevronLeft, X, RotateCw, Copy, Zap, FileText, Calendar, Timer, Edit3, CalendarPlus, Bell, CalendarDays, CheckSquare, Clock3, Settings } from "lucide-react";
+import { Mic, MicOff, Check, Trash2, Send, Inbox, AlertTriangle, Layers, Sparkles, ChevronDown, ChevronRight, ChevronLeft, X, RotateCw, Copy, Zap, FileText, Calendar, Timer, Edit3, CalendarPlus, Bell, CalendarDays, CheckSquare, Clock3, Settings, Lock } from "lucide-react";
 import _ from "lodash";
+
+// SHA-256 hash of the access password.
+// To change the password, run in browser console:
+//   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('DEIN_PASSWORT'));
+//   console.log([...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''));
+// Then replace the string below with the new hash.
+const PASS_HASH = "ee87360de3f2e93c0e1f0c11c01cb24d02f03f1c5a29b6e74ef37e4a5e4e8db2";
+const SESSION_KEY = "mmm-auth";
+const SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+async function sha256(str: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function isSessionValid(): boolean {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return false;
+    const { ts } = JSON.parse(raw);
+    return Date.now() - ts < SESSION_TTL;
+  } catch { return false; }
+}
+
+function PasswordGate({ onAuth }: { onAuth: () => void }) {
+  const [pw, setPw] = useState("");
+  const [error, setError] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  async function check() {
+    setChecking(true);
+    const hash = await sha256(pw);
+    if (hash === PASS_HASH) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ ts: Date.now() }));
+      onAuth();
+    } else {
+      setError(true);
+      setPw("");
+    }
+    setChecking(false);
+  }
+
+  return (
+    <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui,-apple-system,sans-serif" }}>
+      <div style={{ background: C.s, border: "1px solid " + C.b + "44", borderRadius: 16, padding: 32, width: 300, textAlign: "center" }}>
+        <div style={{ width: 48, height: 48, borderRadius: 14, background: C.a + "22", border: "1px solid " + C.a + "44", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+          <Lock size={22} color={C.a} />
+        </div>
+        <h2 style={{ color: C.t, fontSize: 18, fontWeight: 700, margin: "0 0 6px" }}>Michelli's Magic Maker</h2>
+        <p style={{ color: C.t3, fontSize: 12, margin: "0 0 20px" }}>Passwort erforderlich</p>
+        <input
+          type="password"
+          value={pw}
+          onChange={e => { setPw(e.target.value); setError(false); }}
+          onKeyDown={e => { if (e.key === "Enter") check(); }}
+          placeholder="Passwort..."
+          autoFocus
+          style={{ width: "100%", background: C.s2, border: "2px solid " + (error ? C.high : C.b + "44"), borderRadius: 9, padding: "10px 12px", color: C.t, fontSize: 14, boxSizing: "border-box", outline: "none", marginBottom: 8 }}
+        />
+        {error && <p style={{ color: C.high, fontSize: 11, margin: "0 0 8px" }}>Falsches Passwort</p>}
+        <button onClick={check} disabled={!pw || checking} style={{ width: "100%", background: pw ? C.a : C.s2, border: "none", borderRadius: 9, padding: "10px", color: pw ? "#fff" : C.t3, fontSize: 14, fontWeight: 600, cursor: pw ? "pointer" : "default" }}>
+          {checking ? "..." : "Einloggen"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const C = {
   bg:'#0d0515',s:'#1a0e2e',s2:'#251540',b:'#3d2560',
@@ -326,6 +393,7 @@ function BudgetBar({used,totalBudget}: {used:number,totalBudget:number}){const p
 
 /* --- Main --- */
 export default function SmartTodoInbox(){
+  const [authed,setAuthed]=useState(()=>isSessionValid());
   const [tasks,setTasks]=useState<Task[]>([]);
   const [input,setInput]=useState('');
   const [processing,setProcessing]=useState(false);
@@ -466,6 +534,7 @@ export default function SmartTodoInbox(){
     {id:'cats',label:'Kat.',I:Layers}
   ];
 
+  if(!authed)return <PasswordGate onAuth={()=>setAuthed(true)}/>;
   if(!loaded)return <div style={{background:C.bg,minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:C.t}}>Laden...</div>;
 
   return(
