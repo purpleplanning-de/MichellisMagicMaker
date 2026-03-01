@@ -432,13 +432,13 @@ export default function SmartTodoInbox(){
   function downloadICS(tl: Task[],fn: string){const blob=new Blob([buildICS(tl)],{type:'text/calendar;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fn||'tasks.ics';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);setTasks(p=>p.map(t=>tl.find(x=>x.id===t.id)?{...t,synced:true}:t));notify('📅 '+tl.length+' Tasks exportiert');}
 
   async function processAI(txt: string){
-    if(!apiKey){notify('Bitte API-Key in Einstellungen eintragen');setShowSettings(true);return;}
+    if(!apiKey){notify('Bitte Gemini API-Key in Einstellungen eintragen');setShowSettings(true);return;}
     setProcessing(true);
     try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,messages:[{role:"user",content:'Du bist ein Task-Assistent. Analysiere diese Aufgabe und antworte NUR mit validem JSON.\n\nAufgabe: "'+txt+'"\nBestehende Kategorien: '+JSON.stringify(allCats)+'\n\nJSON: {"title":"Aufgabe","category":"Kategorie","priority":"high|medium|low","calendarType":"timeblock|allday|reminder|todo","subtasks":["Teilschritte"],"deadline":null,"estimatedHours":1,"tags":["tags"]}\n\nRegeln:\n- category: thematische Gruppierung\n- Nutze bestehende Kategorien wenn passend\n- deadline als ISO-Datum wenn erkennbar, sonst null\n- calendarType: timeblock für fokussierte Arbeit, allday für ganztägige Events, reminder für Erinnerungen, todo für Backlog\n- estimatedHours: bei timeblock 0.25-8, bei allday 8, bei reminder/todo 0'}]})});
+      const prompt='Du bist ein Task-Assistent. Analysiere diese Aufgabe und antworte NUR mit validem JSON.\n\nAufgabe: "'+txt+'"\nBestehende Kategorien: '+JSON.stringify(allCats)+'\n\nJSON: {"title":"Aufgabe","category":"Kategorie","priority":"high|medium|low","calendarType":"timeblock|allday|reminder|todo","subtasks":["Teilschritte"],"deadline":null,"estimatedHours":1,"tags":["tags"]}\n\nRegeln:\n- category: thematische Gruppierung\n- Nutze bestehende Kategorien wenn passend\n- deadline als ISO-Datum wenn erkennbar, sonst null\n- calendarType: timeblock für fokussierte Arbeit, allday für ganztägige Events, reminder für Erinnerungen, todo für Backlog\n- estimatedHours: bei timeblock 0.25-8, bei allday 8, bei reminder/todo 0';
+      const res=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="+apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1000}})});
       const data=await res.json();
-      let raw=(data.content&&data.content.find((b: {type:string})=>b.type==='text'))||{};
-      raw=(raw as {text?:string}).text||'';
+      let raw: string=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
       const p=JSON.parse((raw as string).replace(/```json|```/g,'').trim());
       const ct=p.calendarType||'timeblock';
       const h=ct==='allday'?8:(ct==='reminder'||ct==='todo')?0:(p.estimatedHours||1);
@@ -459,15 +459,14 @@ export default function SmartTodoInbox(){
   const updateTask=useCallback((data: Task)=>{setTasks(p=>p.map(t=>t.id===data.id?{...t,...data}:t));},[]);
 
   async function getAISuggestions(){
-    if(!apiKey){notify('Bitte API-Key in Einstellungen eintragen');setShowSettings(true);return;}
+    if(!apiKey){notify('Bitte Gemini API-Key in Einstellungen eintragen');setShowSettings(true);return;}
     const open=tasks.filter(t=>!t.completed);if(!open.length)return;
     setAiSuggestion({loading:true});
     try{
       const lines=open.map(t=>'- '+t.title+' ['+t.category+','+t.priority+','+(CAL_TYPES[t.calendarType]?CAL_TYPES[t.calendarType].label:'')+(t.estimatedHours?','+fmtH(t.estimatedHours):'')+',DL:'+(t.deadline||'keins')+']').join('\n');
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,messages:[{role:"user",content:'Analysiere diese offenen Tasks und gib kurze Empfehlungen auf Deutsch. Max 150 Wörter.\n\nTasks:\n'+lines}]})});
+      const res=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="+apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:'Analysiere diese offenen Tasks und gib kurze Empfehlungen auf Deutsch. Max 150 Wörter.\n\nTasks:\n'+lines}]}],generationConfig:{maxOutputTokens:1000}})});
       const data=await res.json();
-      const txt2=(data.content&&data.content.find((b: {type:string})=>b.type==='text'))||{};
-      setAiSuggestion({loading:false,text:(txt2 as {text?:string}).text||'Keine Vorschläge.'});
+      setAiSuggestion({loading:false,text:data?.candidates?.[0]?.content?.parts?.[0]?.text||'Keine Vorschläge.'});
     }catch(e){setAiSuggestion({loading:false,text:'Fehlgeschlagen.'});}
   }
 
@@ -556,9 +555,9 @@ export default function SmartTodoInbox(){
         {showSettings&&<div style={{background:C.s,border:'1px solid '+C.b+'22',borderRadius:12,padding:14,marginBottom:14}}>
           <div style={{fontSize:12,fontWeight:600,color:C.t,marginBottom:10,display:'flex',alignItems:'center',gap:5}}><Settings size={13} color={C.t2}/> Einstellungen</div>
           <div style={{marginBottom:10}}>
-            <label style={{fontSize:11,color:C.t3,fontWeight:600,display:'block',marginBottom:4}}>Anthropic API-Key</label>
-            <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-ant-..." style={{width:'100%',background:C.s2,border:'1px solid '+(apiKey?C.a:C.b)+'44',borderRadius:8,padding:'8px 10px',color:C.t,fontSize:12,boxSizing:'border-box'}}/>
-            <div style={{fontSize:10,color:C.t3,marginTop:4}}>Wird nur lokal in deinem Browser gespeichert. <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" style={{color:C.a}}>API-Key erstellen →</a></div>
+            <label style={{fontSize:11,color:C.t3,fontWeight:600,display:'block',marginBottom:4}}>Google Gemini API-Key (kostenlos)</label>
+            <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="AIza..." style={{width:'100%',background:C.s2,border:'1px solid '+(apiKey?C.a:C.b)+'44',borderRadius:8,padding:'8px 10px',color:C.t,fontSize:12,boxSizing:'border-box'}}/>
+            <div style={{fontSize:10,color:C.t3,marginTop:4}}>Kostenlos · Wird nur lokal gespeichert. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{color:C.a}}>API-Key erstellen →</a></div>
           </div>
           <div>
             <label style={{fontSize:11,color:C.t3,fontWeight:600,display:'block',marginBottom:4}}>Google Kalender Name</label>
